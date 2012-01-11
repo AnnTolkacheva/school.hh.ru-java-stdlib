@@ -6,7 +6,6 @@ import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 
@@ -15,111 +14,118 @@ public class Server {
   Substitutor3000 substitutor;
   ServerSocket serverSocket;
   int sleepTime;
-  
-  public Server(InetSocketAddress addr) {
+
+  public Server(InetSocketAddress addr) throws IOException{
     socketAddress = addr;
     substitutor = new Substitutor3000();
     sleepTime = 0;
-    try {
-      serverSocket = new ServerSocket(addr.getPort(), 0, addr.getAddress());
-    } catch (IOException e) {
-      e.printStackTrace();
-    }
-    
-   // throw new UnsupportedOperationException();
+    serverSocket = new ServerSocket(addr.getPort(), 0, addr.getAddress());
   }
 
   public void run() throws IOException {
     while (true) {
       final Socket socket = serverSocket.accept();
       Runnable runnable = new Runnable() {
-        public void run() { 
+        public void run() {
           try {
             InputStream in = socket.getInputStream();
             OutputStream out = socket.getOutputStream();
             byte bufer[] = new byte[1024*16];
             int buferSize = in.read(bufer);
+            Thread.sleep(sleepTime);
             String request = new String(bufer, 0, buferSize);
             String response = getResponse(request);
             out.write(response.getBytes());
-            socket.close();
           }
-          catch (IOException e) {
-            e.printStackTrace();
+          catch (Exception e) {
+            System.out.println(e.getLocalizedMessage());
+          }
+          finally {
+            try {
+              socket.close();
+            }
+            catch (IOException e) {
+              System.out.println(e.getLocalizedMessage());
+            }
           }
         };
       };
       Thread t = new Thread(runnable);
-      try {
-        Thread.sleep(sleepTime);
-      } 
-      catch (InterruptedException e) {
-        e.printStackTrace();
-      }
       t.start();
     }
   }
-  
+
   private List<String> parse(String request) {
-    List<String> rezult = Arrays.asList(request.split(" ", 0));
-    if (rezult == null || rezult.size() < 2) {
-      rezult = null;
-    } 
-    else if (rezult.get(0) == "GET") {
-      for (int index = 2; index < rezult.size(); index++) {
-        rezult.remove(index);
+    List<String> rezult = new LinkedList<String>();
+    if (request.startsWith(String.valueOf("SET SLEEP"))
+        && request.length() > 9) {
+      rezult.add(request.substring(0, 9));
+      rezult.add(request.substring(10, request.length()));
+    }
+    else if (request.startsWith(String.valueOf("GET"))
+        && request.length() > 3) {
+      rezult.add(request.substring(0, 3));
+      rezult.add(request.substring(4, request.length()));
+    }
+    else if (request.startsWith(String.valueOf("PUT"))
+        && request.length() > 3) {
+      rezult.add(request.substring(0, 3));
+      String[] binParsing = request.substring(4, 
+          request.length()).split(" ", 2);
+      if (binParsing.length < 2) {
+        rezult = null;
+      }
+      else {
+        rezult.add(binParsing[0]);
+        rezult.add(binParsing[1]);
       }
     }
-    else if (rezult.get(0) == "PUT" && rezult.size() > 2) {
-      if (rezult.get(2).charAt(0) == '$') {
-        rezult.remove(0);
-        rezult.add("SET KEYS");
-        rezult.add(rezult.remove(1));
-        while (rezult.get(0) != "SET KEYS") {
-          int lenth = rezult.get(0).length() - 1;
-          rezult.add(rezult.remove(0).substring(2, lenth));
+    else {
+      rezult = null;
+    }
+    return rezult;
+  }
+
+  private String getResponse(String request) {
+    String rezult = null;
+    if (request == null) {
+      rezult = "WRONG REQUEST";
+    }
+    else {
+      List<String> parsedRequest = this.parse(request);
+      if (parsedRequest == null) {
+        rezult = "WRONG REQUEST";
+      }
+      else if (parsedRequest.get(0).contentEquals("GET")
+          && parsedRequest.size() > 1) {
+        rezult = "VALUE" + "\n" + this.substitutor.get(
+            parsedRequest.get(1));
+      }
+      else if (parsedRequest.get(0).contentEquals("PUT")
+          && parsedRequest.size() > 2) {
+        this.substitutor.put(parsedRequest.get(1),
+            parsedRequest.get(2));
+        rezult = "OK";
+      }
+      else if (parsedRequest.get(0).contentEquals("SET SLEEP")
+          && parsedRequest.size() > 1) {
+        Integer time = Integer.parseInt(parsedRequest.get(1));
+        if (time != null) {
+          sleepTime = time;
+          rezult = "OK";
+        }
+        else {
+          rezult = "WRONG REQUEST";
         }
       }
       else {
-        for (int index = 3; index < rezult.size(); index++) {
-          rezult.remove(index);
-        }
+        rezult = "WRONG REQUEST";
       }
-    } 
-    else if (rezult.get(0) != "SET SLEEP") {
-      rezult = null;
     }
     return rezult;
   }
-  
-  private String getResponse(String request) {
-    String rezult = null;
-    List<String> parsedRequest = this.parse(request);
-    if (parsedRequest == null) {
-      rezult = "WRONG REQUEST";
- //     throw new UnsupportedOperationException();
-    }
-    else if (parsedRequest.get(0) == "GET") {
-      rezult = "VALUE" + "\n" + this.substitutor.get(parsedRequest.get(1)) + "\n" + "connection closed";
-    }
-    else if (parsedRequest.get(0) == "PUT") {
-      this.substitutor.put(parsedRequest.get(1), parsedRequest.get(2));
-      rezult = "OK" + "\n" + "connection closed";
-    }
-    else if (parsedRequest.get(0) == "SET KEYS") {
-      String key = parsedRequest.get(1);
-      parsedRequest.remove(0);
-      parsedRequest.remove(1);
-      this.substitutor.setSuperKeys(key, parsedRequest);
-      rezult = "OK" + "\n" + "connection closed";
-    }
-    else if (parsedRequest.get(0) == "SET SLEEP") {
-      sleepTime = Integer.getInteger(parsedRequest.get(1));
-      rezult = "OK" + "\n" + "connection closed";
-    }
-    return rezult;
-  }
+
   public int getPort() {
-	return socketAddress.getPort();
+    return socketAddress.getPort();
   }
 }

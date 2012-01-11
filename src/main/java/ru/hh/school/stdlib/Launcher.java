@@ -1,14 +1,15 @@
-﻿package ru.hh.school.stdlib;
+package ru.hh.school.stdlib;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
 
 public class Launcher {
   Launcher() {
-    
+
   }
   public static void main(String[] args) throws IOException {
     String host;
+
     int port;
     try {
       if (args.length == 0) {
@@ -23,7 +24,7 @@ public class Launcher {
     } catch (Exception e) {
       System.err.printf("Usage: %s [host port]%n", args[0]);
       System.exit(1);
-      return; // РїРѕРїСЂРѕР±СѓР№С‚Рµ Р·Р°РєРѕРјРјРµРЅС‚РёСЂРѕРІР°С‚СЊ СЌС‚РѕС‚ return
+      return;
     }
     InetSocketAddress addr = InetSocketAddress.createUnresolved(host, port);
 
