@@ -11,6 +11,11 @@ import org.junit.Assert;
 import org.junit.Test;
 
 public class ComplexTest extends BaseFunctionalTest {
+  public ComplexTest(int port)
+  {
+    super(port);
+  }
+
   private void Put(String key, String value) throws IOException {
     Socket s = connect();
 

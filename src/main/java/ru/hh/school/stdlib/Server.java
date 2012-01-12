@@ -1,8 +1,9 @@
 package ru.hh.school.stdlib;
-
+import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
+import java.io.InputStreamReader;
+import java.io.PrintWriter;
+import java.io.Writer;
 import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -28,14 +29,14 @@ public class Server {
       Runnable runnable = new Runnable() {
         public void run() {
           try {
-            InputStream in = socket.getInputStream();
-            OutputStream out = socket.getOutputStream();
-            byte bufer[] = new byte[1024*16];
-            int buferSize = in.read(bufer);
+            Writer out = new PrintWriter(socket.getOutputStream());
+            BufferedReader in = new BufferedReader(new InputStreamReader
+                (socket.getInputStream()));            
             Thread.sleep(sleepTime);
-            String request = new String(bufer, 0, buferSize);
+            String request = in.readLine();;
             String response = getResponse(request);
-            out.write(response.getBytes());
+            out.write(response);
+            out.flush();
           }
           catch (Exception e) {
             System.out.println(e.getLocalizedMessage());
