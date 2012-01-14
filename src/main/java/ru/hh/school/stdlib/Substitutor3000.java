@@ -1,12 +1,16 @@
 package ru.hh.school.stdlib;
 
 import java.util.HashMap;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Substitutor3000 {
   HashMap<String, String> cache;
+  final Pattern substitution;
 
   public Substitutor3000 () {
     cache = new HashMap<String, String>();
+    substitution = Pattern.compile("\\$\\{([^\\$]{0,})\\}");
 	}
 
   public void put(String key, String value) {
@@ -21,22 +25,19 @@ public class Substitutor3000 {
       return null;
     }
     String rezult = "";
-    String regArray[] = value.split("\\$\\{");
-    int index = 0;
-    if (value.charAt(0) != '$') {
-      rezult += regArray[index];
-      index++;
-    }
-    for (; index < regArray.length; index++) {
-      String tempArray[] = regArray[index].split("\\}");
-      if (tempArray.length > 0) {
-        if (this.cache.containsKey(tempArray[0])) {
-          rezult += this.cache.get(tempArray[0]);
-        }
+    Matcher m = substitution.matcher(value);
+    while( m.find()) {
+      String key = m.group();
+      key = key.split("\\{|\\}|\\$")[2];
+      String replacement;
+      if (this.cache.containsKey(key)) {
+        replacement = this.cache.get(key);
       }
-      if (tempArray.length > 1) {
-          rezult += tempArray[index];
+      else {
+        replacement = "";
       }
+      rezult = m.replaceFirst(replacement);
+      m = substitution.matcher(rezult);
     }
     return rezult;
   }

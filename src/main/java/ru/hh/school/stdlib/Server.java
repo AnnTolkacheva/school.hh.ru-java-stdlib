@@ -1,4 +1,5 @@
 package ru.hh.school.stdlib;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -9,18 +10,26 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 public class Server {
   InetSocketAddress socketAddress;
   Substitutor3000 substitutor;
   ServerSocket serverSocket;
-  int sleepTime;
+  public static List<Pattern> operations;
+  AtomicInteger sleepTime;
 
   public Server(InetSocketAddress addr) throws IOException{
     socketAddress = addr;
     substitutor = new Substitutor3000();
-    sleepTime = 0;
+    sleepTime = new AtomicInteger(0);
     serverSocket = new ServerSocket(addr.getPort(), 0, addr.getAddress());
+    operations = new LinkedList<Pattern>();
+    operations.add(Pattern.compile("PUT "));
+    operations.add(Pattern.compile("GET "));
+    operations.add(Pattern.compile("SET SLEEP "));
   }
 
   public void run() throws IOException {
@@ -32,7 +41,7 @@ public class Server {
             Writer out = new PrintWriter(socket.getOutputStream());
             BufferedReader in = new BufferedReader(new InputStreamReader
                 (socket.getInputStream()));            
-            Thread.sleep(sleepTime);
+            Thread.sleep(sleepTime.intValue());
             String request = in.readLine();;
             String response = getResponse(request);
             out.write(response);
@@ -56,74 +65,41 @@ public class Server {
     }
   }
 
-  private List<String> parse(String request) {
-    List<String> rezult = new LinkedList<String>();
-    if (request.startsWith(String.valueOf("SET SLEEP"))
-        && request.length() > 9) {
-      rezult.add(request.substring(0, 9));
-      rezult.add(request.substring(10, request.length()));
-    }
-    else if (request.startsWith(String.valueOf("GET"))
-        && request.length() > 3) {
-      rezult.add(request.substring(0, 3));
-      rezult.add(request.substring(4, request.length()));
-    }
-    else if (request.startsWith(String.valueOf("PUT"))
-        && request.length() > 3) {
-      rezult.add(request.substring(0, 3));
-      String[] binParsing = request.substring(4, 
-          request.length()).split(" ", 2);
-      if (binParsing.length < 2) {
-        rezult = null;
-      }
-      else {
-        rezult.add(binParsing[0]);
-        rezult.add(binParsing[1]);
-      }
-    }
-    else {
-      rezult = null;
-    }
-    return rezult;
-  }
-
   private String getResponse(String request) {
     String rezult = null;
-    if (request == null) {
-      rezult = "WRONG REQUEST";
-    }
-    else {
-      List<String> parsedRequest = this.parse(request);
-      if (parsedRequest == null) {
-        rezult = "WRONG REQUEST";
-      }
-      else if (parsedRequest.get(0).contentEquals("GET")
-          && parsedRequest.size() > 1) {
-        rezult = "VALUE" + "\n" + this.substitutor.get(
-            parsedRequest.get(1));
-      }
-      else if (parsedRequest.get(0).contentEquals("PUT")
-          && parsedRequest.size() > 2) {
-        this.substitutor.put(parsedRequest.get(1),
-            parsedRequest.get(2));
+    // PUT operation
+    if (operations.get(0).matcher(request).lookingAt()) {
+      String argument = operations.get(0).matcher(request).replaceFirst("");
+      String[] argumentParsing = argument.split(" ", 2);
+      if (argumentParsing.length == 2) {
+        this.substitutor.put(argumentParsing[0], argumentParsing[1]);
         rezult = "OK";
-      }
-      else if (parsedRequest.get(0).contentEquals("SET SLEEP")
-          && parsedRequest.size() > 1) {
-        Integer time = Integer.parseInt(parsedRequest.get(1));
-        if (time != null) {
-          sleepTime = time;
-          rezult = "OK";
-        }
-        else {
-          rezult = "WRONG REQUEST";
-        }
       }
       else {
         rezult = "WRONG REQUEST";
       }
     }
-    return rezult;
+    // GET operation
+    else if (operations.get(1).matcher(request).lookingAt()) {
+      Matcher m = operations.get(1).matcher(request);
+      rezult = "VALUE" + "\n" + this.substitutor.get(m.replaceFirst(""));
+    }
+    // SET SLEEP operation
+    else if (operations.get(2).matcher(request).lookingAt()) {
+      Integer time = Integer.parseInt(
+          operations.get(2).matcher(request).replaceFirst(""));
+      if (time != null) {
+        sleepTime.set(time);
+        rezult = "OK";
+      }
+      else {
+        rezult = "WRONG REQUEST";
+      }
+    }
+    else {
+      rezult = "WRONG REQUEST";
+    }
+     return rezult;
   }
 
   public int getPort() {
